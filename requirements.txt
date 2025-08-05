@@ -1,0 +1,11 @@
+# requirements.txt
+streamlit
+pandas
+mysql-connector-python
+requests
+groq
+networkx
+pyvis
+matplotlib
+plotly
+numpy
