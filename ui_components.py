@@ -5,8 +5,7 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 import math
 
-
-# ── Enhanced CSS (same as before) ──────────────────────────────────────────────
+# ── Enhanced CSS with Interactive Colors ────────────────────────────────────────
 def inject_css():
     st.markdown("""
     <style>
@@ -18,6 +17,12 @@ def inject_css():
         text-align: center;
         margin-bottom: 2rem;
         box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        animation: glow 2s ease-in-out infinite alternate;
+    }
+    
+    @keyframes glow {
+        from { box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        to { box-shadow: 0 15px 40px rgba(102, 126, 234, 0.4); }
     }
     
     .metric-card {
@@ -26,6 +31,12 @@ def inject_css():
         border-radius: 10px;
         box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         margin: 0.5rem 0;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.2);
     }
     
     .stButton>button {
@@ -41,14 +52,26 @@ def inject_css():
     
     .stButton>button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        background: linear-gradient(135deg, #5a67d8, #6b46c1);
+    }
+    
+    .stButton>button:active {
+        transform: translateY(0px);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
     }
     
     .schema-table {
-        background: #f8f9fa;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
         border-radius: 8px;
         padding: 1rem;
         margin: 0.5rem 0;
+        border-left: 4px solid #667eea;
+        transition: border-color 0.3s ease;
+    }
+    
+    .schema-table:hover {
+        border-left-color: #f093fb;
     }
     
     .query-box {
@@ -56,17 +79,78 @@ def inject_css():
         border-radius: 10px;
         padding: 1rem;
         margin: 1rem 0;
+        border: 2px solid transparent;
+        transition: border-color 0.3s ease;
+    }
+    
+    .query-box:hover {
+        border-color: #667eea;
     }
     
     .sidebar .stSelectbox {
         margin-bottom: 1rem;
     }
     
+    .provider-card {
+        background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+        border-radius: 12px;
+        padding: 1rem;
+        border: 2px solid #e9ecef;
+        margin: 0.5rem 0;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .provider-card:hover {
+        border-color: #667eea;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+    }
+    
+    .provider-card.selected {
+        border-color: #667eea;
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 50%);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+    }
+    
+    .model-badge {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.85em;
+        font-weight: bold;
+        display: inline-block;
+        margin: 0.2rem 0.3rem 0.2rem 0;
+        transition: transform 0.2s ease;
+    }
+    
+    .model-badge:hover {
+        transform: scale(1.05);
+    }
+    
+    .status-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+        animation: pulse 2s infinite;
+    }
+    
+    .status-groq { background-color: #22c55e; }
+    .status-ollama { background-color: #3b82f6; }
+    
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+    
     .main-content {
         padding: 1rem;
     }
     </style>""", unsafe_allow_html=True)
-
 
 # ── Enhanced Header ───────────────────────────────────────────────────────────
 def show_header():
@@ -77,6 +161,66 @@ def show_header():
         <p style='opacity: 0.9;'>✨ Ask questions in plain English → Get SQL + results instantly</p>
     </div>""", unsafe_allow_html=True)
 
+# ── Provider Selection Component ──────────────────────────────────────────────
+def show_provider_selection():
+    """Show interactive provider and model selection"""
+    st.markdown("### 🔧 AI Configuration")
+    
+    # Provider selection
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### Choose AI Provider")
+        provider = st.radio(
+            "Select your preferred AI provider:",
+            ["Groq", "Ollama"],
+            key="ai_provider",
+            help="Groq: Cloud-based, fast inference\nOllama: Local models, privacy-focused"
+        )
+    
+    with col2:
+        st.markdown("#### Model Selection")
+        if provider == "Groq":
+            from config import GROQ_MODELS
+            model = st.selectbox(
+                "Choose Groq model:",
+                GROQ_MODELS,
+                key="groq_model",
+                help="Different models have varying capabilities and speeds"
+            )
+            st.markdown('<span class="status-indicator status-groq"></span>Groq Cloud API', unsafe_allow_html=True)
+        else:
+            from config import OLLAMA_MODELS
+            model = st.selectbox(
+                "Choose Ollama model:",
+                OLLAMA_MODELS,
+                key="ollama_model",
+                help="Make sure the selected model is downloaded in Ollama"
+            )
+            st.markdown('<span class="status-indicator status-ollama"></span>Local Ollama', unsafe_allow_html=True)
+    
+    # Model info display
+    with st.expander("ℹ️ Model Information"):
+        if provider == "Groq":
+            model_info = {
+                "llama-3.3-70b-versatile": "Latest Llama model, excellent for complex queries",
+                "llama-3.1-70b-versatile": "Powerful model with good reasoning capabilities",
+                "llama-3.1-8b-instant": "Faster, lighter model for quick responses",
+                "mixtral-8x7b-32768": "Mixture of Experts model, great for diverse tasks",
+                "gemma2-9b-it": "Google's Gemma model, optimized for instruction following"
+            }
+        else:
+            model_info = {
+                "llama3.2": "Latest Llama model optimized for local deployment",
+                "llama3.1": "Previous version of Llama, very capable",
+                "codellama": "Specialized for code generation and understanding",
+                "mistral": "Efficient model with good performance",
+                "gemma2": "Google's open model, good balance of size and capability"
+            }
+        
+        st.write(f"**{model}:** {model_info.get(model, 'Advanced language model')}")
+    
+    return provider, model
 
 # ── Schema Statistics ─────────────────────────────────────────────────────────
 def show_schema_stats(schema):
@@ -110,10 +254,9 @@ def show_schema_stats(schema):
             <h2 style='margin: 0.5rem 0;'>{}</h2>
         </div>""".format(avg_cols), unsafe_allow_html=True)
 
-
-# ── FIXED: Graphical Schema Viewer ──────────────────────────────────────────────
+# ── Graphical Schema Viewer ──────────────────────────────────────────────────
 def create_schema_network_graph(schema):
-    """Create an interactive network graph using Plotly - FIXED VERSION"""
+    """Create an interactive network graph using Plotly"""
     if not schema:
         st.info("No schema available to display.")
         return
@@ -137,9 +280,8 @@ def create_schema_network_graph(schema):
         # Infer relationships based on foreign key naming conventions
         for table, info in schema.items():
             for column in info['columns']:
-                # Look for foreign key patterns (column_id, table_id, etc.)
                 if column.lower().endswith('_id') and column.lower() != 'id':
-                    potential_ref = column[:-3]  # Remove '_id'
+                    potential_ref = column[:-3]
                     if potential_ref in table_names:
                         edges.append({
                             'from': table,
@@ -172,7 +314,6 @@ def create_schema_network_graph(schema):
                 edge_x.extend([x0, x1, None])
                 edge_y.extend([y0, y1, None])
             
-            # Add edges to plot
             fig.add_trace(go.Scatter(
                 x=edge_x, y=edge_y,
                 line=dict(width=2, color='rgba(125,125,125,0.5)'),
@@ -232,7 +373,6 @@ def create_schema_network_graph(schema):
         
         st.plotly_chart(fig, use_container_width=True)
         
-        # Show relationship details if any
         if edges:
             st.subheader("🔗 Detected Relationships")
             rel_df = pd.DataFrame([
@@ -250,18 +390,15 @@ def create_schema_network_graph(schema):
         for table in schema.keys():
             st.write(f"• {table}")
 
-
-# ── FIXED: Column Types Analysis ─────────────────────────────────────────────────
+# ── Column Types Analysis ────────────────────────────────────────────────────
 def show_column_types_analysis(schema):
-    """Analyze column types across all tables - FIXED VERSION"""
+    """Analyze column types across all tables"""
     try:
-        # Analyze column types across all tables
         type_counts = {}
         type_details = []
         
         for table, info in schema.items():
             for column, col_type in info['types'].items():
-                # Simplify type names
                 simple_type = col_type.split('(')[0].lower().strip()
                 type_counts[simple_type] = type_counts.get(simple_type, 0) + 1
                 type_details.append({
@@ -275,11 +412,9 @@ def show_column_types_analysis(schema):
             st.warning("No column type data available.")
             return
         
-        # Create two columns for charts
         col1, col2 = st.columns(2)
         
         with col1:
-            # Create pie chart for column types
             fig_pie = px.pie(
                 values=list(type_counts.values()),
                 names=list(type_counts.keys()),
@@ -291,7 +426,6 @@ def show_column_types_analysis(schema):
             st.plotly_chart(fig_pie, use_container_width=True)
         
         with col2:
-            # Create bar chart
             fig_bar = px.bar(
                 x=list(type_counts.keys()),
                 y=list(type_counts.values()),
@@ -306,10 +440,8 @@ def show_column_types_analysis(schema):
             )
             st.plotly_chart(fig_bar, use_container_width=True)
         
-        # Show detailed breakdown
         st.subheader("📊 Detailed Breakdown")
         
-        # Summary table
         summary_df = pd.DataFrame([
             {
                 "Data Type": k, 
@@ -320,11 +452,9 @@ def show_column_types_analysis(schema):
         ])
         st.dataframe(summary_df, use_container_width=True)
         
-        # Detailed table (expandable)
         with st.expander("🔍 View All Columns by Type"):
             detail_df = pd.DataFrame(type_details)
             
-            # Filter by type
             selected_type = st.selectbox(
                 "Filter by type:",
                 ['All'] + list(sorted(type_counts.keys()))
@@ -345,8 +475,7 @@ def show_column_types_analysis(schema):
         st.info("Raw schema data:")
         st.json(schema)
 
-
-# ── FIXED: Enhanced Schema Viewer ──────────────────────────────────────────────
+# ── Enhanced Schema Viewer ──────────────────────────────────────────────────
 def schema_expander(schema: dict):
     if not schema:
         st.info("🔍 No schema loaded. Please select a database first.")
@@ -354,10 +483,8 @@ def schema_expander(schema: dict):
     
     st.subheader("🗂️ Database Schema Details")
     
-    # Show statistics
     show_schema_stats(schema)
     
-    # Schema view options
     view_option = st.radio(
         "Choose view:",
         ["📋 Table Details", "🔗 Relationship Graph", "📊 Column Types Analysis"],
@@ -365,7 +492,6 @@ def schema_expander(schema: dict):
     )
     
     if view_option == "📋 Table Details":
-        # Original table view with enhancements
         for table, info in schema.items():
             with st.expander(f"📅 {table} ({len(info['columns'])} columns)", expanded=False):
                 df = pd.DataFrame([
@@ -373,7 +499,6 @@ def schema_expander(schema: dict):
                     for c in info['columns']
                 ])
                 
-                # Color code data types - FIXED: Using Styler.map instead of deprecated applymap
                 def highlight_types(val):
                     if 'int' in val.lower():
                         return 'background-color: #e3f2fd'
@@ -393,8 +518,7 @@ def schema_expander(schema: dict):
     elif view_option == "📊 Column Types Analysis":
         show_column_types_analysis(schema)
 
-
-# ── Enhanced History Display (same as before) ─────────────────────────────────
+# ── Enhanced History Display ─────────────────────────────────────────────────
 def show_enhanced_history(history):
     if not history:
         st.info("📜 No query history yet. Run some queries to see them here!")
@@ -402,7 +526,6 @@ def show_enhanced_history(history):
     
     st.subheader("📜 Query History")
     
-    # History statistics
     col1, col2 = st.columns(2)
     with col1:
         st.metric("Total Queries", len(history))
@@ -410,41 +533,40 @@ def show_enhanced_history(history):
         avg_time = sum(float(h['time'].replace('s', '')) for h in history) / len(history)
         st.metric("Avg Execution Time", f"{avg_time:.3f}s")
     
-    # Display history with enhanced formatting
     for i, item in enumerate(reversed(history)):
         with st.expander(f"Query {len(history)-i}: {item['nl'][:50]}...", expanded=False):
             col1, col2 = st.columns([3, 1])
             
             with col1:
                 st.write(f"**Database:** {item['db']}")
+                st.write(f"**Provider:** {item.get('provider', 'N/A')} - {item.get('model', 'N/A')}")
                 st.write(f"**Question:** {item['nl']}")
                 st.code(item['sql'], language='sql')
             
             with col2:
                 st.metric("Execution Time", item['time'])
 
-
-# ── Save History (same as before) ─────────────────────────────────────────────
-def save_history(nl, sql, db, t, result_count=0):
+# ── Save History ─────────────────────────────────────────────────────────────
+def save_history(nl, sql, db, t, provider, model, result_count=0):
     st.session_state.history.append({
         "nl": nl, 
         "sql": sql, 
         "db": db, 
+        "provider": provider,
+        "model": model,
         "time": f"{t:.3f}s",
         "result_count": result_count,
         "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
     })
-    st.session_state.history = st.session_state.history[-20:]  # cap 20
+    st.session_state.history = st.session_state.history[-20:]
 
-
-# ── Query Result Display (same as before) ─────────────────────────────────────
+# ── Query Result Display ─────────────────────────────────────────────────────
 def display_query_results(df, execution_time):
     """Enhanced display for query results"""
     if df.empty:
         st.info("📭 No rows returned by the query.")
         return
     
-    # Results summary
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Rows Returned", len(df))
@@ -453,7 +575,6 @@ def display_query_results(df, execution_time):
     with col3:
         st.metric("Execution Time", f"{execution_time:.3f}s")
     
-    # Data preview options
     st.subheader("📊 Query Results")
     
     view_option = st.radio(
@@ -465,7 +586,6 @@ def display_query_results(df, execution_time):
     if view_option == "📋 Table View":
         st.dataframe(df, use_container_width=True)
         
-        # Download option
         csv = df.to_csv(index=False)
         st.download_button(
             label="📥 Download as CSV",
@@ -475,7 +595,6 @@ def display_query_results(df, execution_time):
         )
     
     elif view_option == "📈 Quick Charts (if applicable)":
-        # Try to create simple visualizations for numeric data
         numeric_cols = df.select_dtypes(include=['number']).columns
         
         if len(numeric_cols) > 0:

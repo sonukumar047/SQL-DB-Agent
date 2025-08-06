@@ -4,7 +4,7 @@ from groq_helpers import nl_to_sql
 from sql_helpers import get_db_schema, run_sql_query, validate_sql
 from ui_components import (
     inject_css, show_header, schema_expander, save_history, 
-    show_enhanced_history, display_query_results
+    show_enhanced_history, display_query_results, show_provider_selection
 )
 from config import DATABASES
 
@@ -34,6 +34,11 @@ if "show_hist" not in st.session_state:
 # ── Enhanced Sidebar ───────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### 🎛️ Control Panel")
+    
+    # AI Provider and Model Selection
+    provider, model = show_provider_selection()
+    
+    st.markdown("---")
     
     # Database selection
     db = st.selectbox(
@@ -73,6 +78,10 @@ with st.sidebar:
         total_cols = sum(len(info['columns']) for info in st.session_state.schema.values())
         st.metric("Total Columns", total_cols)
     
+    # Current configuration display
+    st.markdown("### ⚙️ Current Config")
+    st.info(f"**Provider:** {provider}\n**Model:** {model}\n**Database:** {db}")
+    
     st.markdown("---")
     st.markdown("### 💡 Tips")
     with st.expander("Query Examples"):
@@ -85,7 +94,6 @@ with st.sidebar:
         """)
 
 # ── Main Content Area ──────────────────────────────────────────────────────────
-# Query input section
 st.markdown("### 💬 Ask Your Question")
 st.markdown('<div class="query-box">', unsafe_allow_html=True)
 
@@ -98,7 +106,7 @@ with col1:
     )
 
 with col2:
-    st.markdown("<br>", unsafe_allow_html=True)  # Spacing
+    st.markdown("<br>", unsafe_allow_html=True)
     run_button = st.button("🚀 Run Query", use_container_width=True, type="primary")
 
 st.markdown('</div>', unsafe_allow_html=True)
@@ -110,16 +118,17 @@ if run_button and nl_query:
     else:
         try:
             # Generate SQL
-            with st.spinner("🧠 Generating SQL..."):
-                sql = nl_to_sql(nl_query, db, st.session_state.schema)
+            with st.spinner(f"🧠 Generating SQL using {provider} ({model})..."):
+                sql = nl_to_sql(nl_query, db, st.session_state.schema, provider, model)
             
             # Validate SQL
             ok, msg = validate_sql(sql)
             if not ok:
                 st.error(f"❌ SQL Validation Failed: {msg}")
             else:
-                # Display generated SQL
+                # Display generated SQL with provider info
                 st.markdown("### 🔧 Generated SQL")
+                st.info(f"Generated using **{provider}** with model **{model}**")
                 st.code(sql, language="sql")
                 
                 # Execute query
@@ -127,7 +136,7 @@ if run_button and nl_query:
                     df, execution_time = run_sql_query(sql, db)
                 
                 # Save to history
-                save_history(nl_query, sql, db, execution_time, len(df))
+                save_history(nl_query, sql, db, execution_time, provider, model, len(df))
                 
                 # Display results
                 st.success(f"✅ Query executed successfully!")
@@ -135,6 +144,9 @@ if run_button and nl_query:
                 
         except Exception as e:
             st.error(f"❌ Error: {str(e)}")
+            if "Ollama" in str(e):
+                st.info("💡 **Tip:** Make sure Ollama is running and the selected model is downloaded.")
+                st.code("ollama pull " + model, language="bash")
 
 # ── Schema and History Display ─────────────────────────────────────────────────
 if st.session_state.get("show_schema"):
@@ -152,5 +164,6 @@ st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #666; padding: 2rem;'>
     <p>🤖 Powered by AI • Built with Streamlit • Enhanced Database Query Experience</p>
+    <p style='font-size: 0.9em; opacity: 0.7;'>Supports both Groq Cloud API and Local Ollama models</p>
 </div>
 """, unsafe_allow_html=True)
