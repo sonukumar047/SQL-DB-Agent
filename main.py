@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from groq_helpers import nl_to_sql
+from llm_helpers import nl_to_sql
 from sql_helpers import get_db_schema, run_sql_query, validate_sql
 from ui_components import (
     inject_css, show_header, schema_expander, save_history, 
